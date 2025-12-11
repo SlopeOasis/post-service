@@ -1,4 +1,4 @@
-package com.slopeoasis.user;
+package com.slopeoasis.post;
 
 /**
  * Hello world!
