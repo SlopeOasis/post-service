@@ -10,12 +10,12 @@ import org.springframework.data.repository.query.Param;
 import com.slopeoasis.post.entity.Rating;
 
 public interface RatingRepo extends JpaRepository<Rating, Long> {
-    Optional<Rating> findByPostIdAndBuyerId(Long postId, String buyerId);
-    List<Rating> findByPostId(Long postId);
+    Optional<Rating> findByPostIdAndBuyerId(Integer postId, String buyerId);
+    List<Rating> findByPostId(Integer postId);
 
     @Query("SELECT AVG(r.rating) FROM Rating r WHERE r.postId = :postId")
-    Double averageForPost(@Param("postId") Long postId);
+    Double averageForPost(@Param("postId") Integer postId);
 
     @Query("SELECT COUNT(r) FROM Rating r WHERE r.postId = :postId")
-    Long countForPost(@Param("postId") Long postId);
+    Long countForPost(@Param("postId") Integer postId);
 }

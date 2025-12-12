@@ -34,8 +34,8 @@ public class PostsServ {
 
     //Change post status (seller lahko oznaci kot ACTIVE/DISABLED, v primeru ko jo "izbriše" se spremeni le status na USER_DELETED)
     @Transactional
-    public Optional<Posts> changePostStatus(Long postId, String sellerId, Status newStatus) {
-        Optional<Posts> opt = postsRepo.findById(Math.toIntExact(postId));
+    public Optional<Posts> changePostStatus(Integer postId, String sellerId, Status newStatus) {
+        Optional<Posts> opt = postsRepo.findById(postId);
         if (opt.isEmpty()) return Optional.empty();
         Posts p = opt.get();
         if (!p.getSellerId().equals(sellerId)) return Optional.empty();
@@ -45,8 +45,8 @@ public class PostsServ {
 
     //Spremeni osnovne podatke posta (title, description, tags, previewImages, priceUSD, copies)
     @Transactional
-    public Optional<Posts> editPost(Long postId, String sellerId, Posts updates) {
-        Optional<Posts> opt = postsRepo.findById(Math.toIntExact(postId));
+    public Optional<Posts> editPost(Integer postId, String sellerId, Posts updates) {
+        Optional<Posts> opt = postsRepo.findById(postId);
         if (opt.isEmpty()) return Optional.empty();
         Posts p = opt.get();
         if (!p.getSellerId().equals(sellerId)) return Optional.empty();
@@ -63,8 +63,8 @@ public class PostsServ {
 
     //Posodobi glavno datoteko (poveča fileVersion)
     @Transactional
-    public Optional<Posts> updatePostFile(Long postId, String sellerId, String newBlobName) {
-        Optional<Posts> opt = postsRepo.findById(Math.toIntExact(postId));
+    public Optional<Posts> updatePostFile(Integer postId, String sellerId, String newBlobName) {
+        Optional<Posts> opt = postsRepo.findById(postId);
         if (opt.isEmpty()) return Optional.empty();
         Posts p = opt.get();
         if (!p.getSellerId().equals(sellerId)) return Optional.empty();
@@ -94,8 +94,8 @@ public class PostsServ {
     }
 
     //Post info
-    public Optional<Posts> getPostInfo(Long postId) {
-        return postsRepo.findById(Math.toIntExact(postId));
+    public Optional<Posts> getPostInfo(Integer postId) {
+        return postsRepo.findById(postId);
     }
 
     // Search posts by title (ACTIVE)
@@ -120,8 +120,8 @@ public class PostsServ {
 
     //Dodaj kupca (idempotentno) in zmanjša število kopij, če je >0. Ni dovoljeno, če je USER_DELETED ali kopij == 0.
     @Transactional
-    public Optional<Posts> addBuyer(Long postId, String buyerId) {
-        Optional<Posts> opt = postsRepo.findById(Math.toIntExact(postId));
+    public Optional<Posts> addBuyer(Integer postId, String buyerId) {
+        Optional<Posts> opt = postsRepo.findById(postId);
         if (opt.isEmpty()) return Optional.empty();
         Posts p = opt.get();
 
@@ -147,8 +147,8 @@ public class PostsServ {
     }
 
     // Check availability (copies and status)
-    public Optional<Availability> checkAvailability(Long postId) {
-        Optional<Posts> opt = postsRepo.findById(Math.toIntExact(postId));
+    public Optional<Availability> checkAvailability(Integer postId) {
+        Optional<Posts> opt = postsRepo.findById(postId);
         if (opt.isEmpty()) return Optional.empty();
         Posts p = opt.get();
         boolean available = p.getStatus() == Status.ACTIVE && (p.getCopies() == null || p.getCopies() > 0 || p.getCopies() == -1);
@@ -157,7 +157,7 @@ public class PostsServ {
 
     // Submit rating (buyer must have purchased) - idempotent per buyer/post
     @Transactional
-    public boolean submitRating(Long postId, String buyerId, int ratingValue) {
+    public boolean submitRating(Integer postId, String buyerId, int ratingValue) {
         if (ratingValue < 1 || ratingValue > 5) return false;
         Optional<Posts> opt = postsRepo.findById(Math.toIntExact(postId));
         if (opt.isEmpty()) return false;
@@ -178,12 +178,12 @@ public class PostsServ {
     }
 
     // Get ratings for a post (list)
-    public java.util.List<Rating> getRatings(Long postId) {
+    public java.util.List<Rating> getRatings(Integer postId) {
         return ratingRepo.findByPostId(postId);
     }
 
     // Get rating summary (avg + count)
-    public RatingSummary getRatingSummary(Long postId) {
+    public RatingSummary getRatingSummary(Integer postId) {
         Double avg = ratingRepo.averageForPost(postId);
         Long count = ratingRepo.countForPost(postId);
         return new RatingSummary(avg != null ? avg : 0.0, count != null ? count : 0L);

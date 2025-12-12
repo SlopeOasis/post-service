@@ -23,7 +23,7 @@ public class Rating {
     private Long id;
 
     @Column(name = "post_id", nullable = false)
-    private Long postId;
+    private Integer postId;
 
     @Column(name = "buyer_id", nullable = false)
     private String buyerId;
@@ -36,7 +36,7 @@ public class Rating {
 
     public Rating() {}
 
-    public Rating(Long postId, String buyerId, Integer rating) {
+    public Rating(Integer postId, String buyerId, Integer rating) {
         this.postId = postId;
         this.buyerId = buyerId;
         this.rating = rating;
@@ -45,8 +45,8 @@ public class Rating {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Long getPostId() { return postId; }
-    public void setPostId(Long postId) { this.postId = postId; }
+    public Integer getPostId() { return postId; }
+    public void setPostId(Integer postId) { this.postId = postId; }
 
     public String getBuyerId() { return buyerId; }
     public void setBuyerId(String buyerId) { this.buyerId = buyerId; }
