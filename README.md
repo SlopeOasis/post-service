@@ -1,7 +1,105 @@
 # Post Service - Dokumentacija
 
 ## Pregled
-Mikroservis za upravljanje objav (postov) digitalnih datotek, ki omogoča nalaganje, iskanje, ocenjevanje in nakup digitalnih izdelkov.
+Mikroservis za upravljanje objav (postov) digitalnih datotek, ki omogoča nalaganje, iskanje, ocenjevanje in nakup digitalnih izdelkov. Uporablja Clerk za JWT avtentikacijo in Azure Blob Storage za shranjevanje datotek.
+
+## Tehnologije
+- **Spring Boot 3.3.0** - Java framework
+- **PostgreSQL 15** - baza podatkov (port 5434)
+- **Clerk JWT** - avtentikacija uporabnikov
+- **Azure Blob Storage** - shranjevanje datotek (Azurite za lokalni razvoj)
+- **Maven** - upravljanje odvisnosti
+
+## Zagon
+
+### Predpogoji
+1. Docker containers morajo biti zagnan (PostgreSQL, Azurite):
+   ```bash
+   cd ../docker
+   docker-compose up -d
+   ```
+
+2. Environment variables (nastavljene v `run-dev.bat`):
+   - `CLERK_ISSUER` - Clerk issuer URL
+   - `CLERK_JWKS_URL` - Clerk JWKS endpoint za preverjanje JWT
+   - `JWT_DEV_MODE` - false (za produkcijo) / true (za dev)
+   - `AZURE_CONNECTION_STRING` - Azure/Azurite connection string
+   - `AZURE_CONTAINER_NAME` - ime kontejnerja (slopeoasisfiles)
+
+### Lokalni razvoj
+```bash
+# Build projekta
+mvn clean package
+
+# Zagon z run-dev.bat (nastavi environment variables)
+.\run-dev.bat
+
+# Ali direktno Maven
+mvn spring-boot:run
+```
+
+Servis teče na **http://localhost:8081**
+
+## Avtentikacija - Clerk JWT
+
+Vsi POST/PUT/DELETE endpointi zahtevajo **Bearer token** v Authorization headerju:
+```
+Authorization: Bearer <clerk-jwt-token>
+```
+
+### Kako deluje JWT verifikacija
+
+1. **JwtInterceptor** prestrezne vse zahtevke na `/posts/**` (razen public endpointov)
+2. **ClerkJwtVerifier**:
+   - Preveri JWT signature proti Clerk JWKS (RSA public keys)
+   - Validira issuer claim
+   - Ekstraktira `usid` (Clerk User ID) iz custom claims
+3. **Request attribute**: `X-User-Id` se nastavi z vrednostjo usid
+4. **Controller**: Dostopa do `X-User-Id` atributa za avtorizacijo
+
+**Dev mode** (JWT_DEV_MODE=true):
+- Signature verifikacija **DISABLED** (samo za lokalni razvoj!)
+- Claims se ekstraktirajo brez preverjanja
+- V logih prikaže `[DEV MODE]` prefix
+
+**Production mode** (JWT_DEV_MODE=false):
+- Signature verifikacija **ENABLED**
+- Uporabljajo se Clerk public keys iz JWKS
+- Zavrne invaliden/pretečen token z 401
+
+### Spring Security konfiguracija
+
+**SpringSecurityConfig.java** onemogoči default Spring Security behavior:
+- CSRF je onemogočen (JWT je stateless)
+- `.permitAll()` dovoli zahtevkom priti do JwtInterceptorja
+- JWT avtentikacijo izvaja **JwtInterceptor**, ne Spring Security filters
+
+## Struktura projekta
+
+```
+src/main/java/com/slopeoasis/post/
+├── Application.java          # Main entry point
+├── clerk/
+│   ├── ClerkJwtVerifier.java    # JWT signature verifikacija
+│   └── ClerkTokenPayload.java   # DTO za JWT claims
+├── config/
+│   ├── SecurityConfig.java       # JwtInterceptor registracija
+│   ├── SpringSecurityConfig.java # Onemogoči CSRF, permitAll
+│   └── WebConfig.java            # CORS konfiguracija
+├── controller/
+│   └── PostsCont.java           # REST endpoints
+├── entity/
+│   ├── Posts.java               # Glavna entiteta
+│   └── Rating.java              # Ocene entiteta
+├── interceptor/
+│   └── JwtInterceptor.java      # JWT validacija pred vsakim requestom
+├── repository/
+│   ├── PostsRepo.java           # JPA repository za Posts
+│   └── RatingRepo.java          # JPA repository za Rating
+└── service/
+    ├── AzureBlobServ.java       # Azure Blob upload/download
+    └── PostsServ.java           # Business logika
+```
 
 ## Entitete
 
@@ -94,9 +192,50 @@ Entiteta za ocene objav s strani kupcev.
 - **`getRatings(Long postId)`** - seznam vseh ocen za objavo
 - **`getRatingSummary(Long postId)`** - povprečje in število ocen
 
-## DTO-ji
+## REST API Endpoints
 
-### Availability
+### 🔒 Zaščiteni endpoints (zahtevajo JWT)
+
+#### **POST /posts**
+Ustvari novo objavo z upload datotek.
+
+**Headers:**
+- `Authorization: Bearer <jwt-token>`
+- `Content-Type: multipart/form-data`
+
+**Form Data:**
+- `file` (MultipartFile) - glavna datoteka (obvezno)
+- `previewImages` (MultipartFile[]) - predogled slike (max 5)
+- `title`, `description`, `priceUSD`, `copies`, `tags`, `status`
+
+**Odgovor:** 201 Created + Posts objekt
+
+#### **PUT /posts/{id}**
+Uredi obstoječo objavo (samo lastnik).
+
+**Odgovor:** 200 OK / 403 Forbidden
+
+#### **PUT /posts/{id}/status**
+Spremeni status objave (ACTIVE/DISABLED/USER_DELETED).
+
+#### **POST /posts/{id}/buyers**
+Dodaj kupca objavi (interni klic payment-service).
+
+### 🌐 Javni endpoints (brez JWT)
+
+- **GET /posts/{id}** - podrobnosti objave
+- **GET /posts/seller/{sellerId}** - objave prodajalca
+- **GET /posts/tag/{tag}** - objave po oznaki
+- **GET /posts/search/title?q=...** - iskanje po naslovu
+
+## Dependencies
+
+- `com.clerk:backend-api:3.2.0` - Clerk JWT SDK
+- `io.jsonwebtoken:jjwt-api:0.12.6` - JWT validation
+- `azure-storage-blob` - File storage
+- `spring-boot-starter-security` - Security framework
+
+*** End Patch
 ```java
 {
   boolean available,
