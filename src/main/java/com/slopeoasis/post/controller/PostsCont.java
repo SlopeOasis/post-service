@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 
 import com.slopeoasis.post.entity.Posts;
 import com.slopeoasis.post.entity.Posts.Status;
@@ -54,20 +56,72 @@ public class PostsCont {
 
     //za kreiranje novih objav
     @PostMapping
-    public ResponseEntity<?> createPost(@RequestBody CreatePostRequest req,
-                                        @RequestAttribute(name = "X-User-Id", required = false) String userId) {
+    public ResponseEntity<?> createPost(
+                                        @RequestParam("title") String title,
+                                        @RequestParam("description") String description,
+                                        @RequestParam("priceUSD") Double priceUSD,
+                                        @RequestParam("copies") Integer copies,
+                                        @RequestParam("tags") String tagsStr,
+                                        @RequestParam("status") String statusStr,
+                                        @RequestParam("file") MultipartFile mainFile,
+                                        @RequestParam(value = "previewImages", required = false) List<MultipartFile> previewImages,
+                                        @RequestAttribute(name = "X-User-Id", required = false) String userId) throws IOException {
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        Optional<Set<Tag>> tagsOpt = parseTags(req.tags);
+        
+        // Parse tags from comma-separated string
+        List<String> tagsList = tagsStr != null && !tagsStr.isBlank() 
+            ? java.util.Arrays.asList(tagsStr.split(",")) 
+            : new java.util.ArrayList<>();
+        
+        // Validate tag format
+        Optional<Set<Tag>> tagsOpt = parseTags(tagsList);
         if (tagsOpt.isEmpty()) return ResponseEntity.badRequest().body("Invalid tag value");
+        
+        // Validate and convert status
+        Status status;
+        try {
+            status = Status.valueOf(statusStr);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid status");
+        }
+        
+        // Upload main file to Azure
+        if (mainFile == null || mainFile.isEmpty()) {
+            return ResponseEntity.badRequest().body("Main file is required");
+        }
+        String mainBlobName;
+        try {
+            mainBlobName = azureBlobServ.uploadFile(mainFile);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to upload main file");
+        }
+        
+        // Upload preview images to Azure
+        List<String> previewBlobNames = new java.util.ArrayList<>();
+        if (previewImages != null) {
+            for (MultipartFile preview : previewImages) {
+                if (preview != null && !preview.isEmpty()) {
+                    try {
+                        previewBlobNames.add(azureBlobServ.uploadFile(preview));
+                    } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to upload preview image");
+                    }
+                }
+            }
+        }
+        
+        // Create the post
         Posts p = new Posts();
-        p.setTitle(req.title);
+        p.setTitle(title);
         p.setSellerId(userId);
-        p.setDescription(req.description);
+        p.setDescription(description);
         p.setTags(tagsOpt.orElseGet(java.util.HashSet::new));
-        p.setAzBlobName(req.azBlobName);
-        p.setPreviewImages(req.previewImages);
-        p.setPriceUSD(req.priceUSD);
-        p.setCopies(req.copies);
+        p.setAzBlobName(mainBlobName);
+        p.setPreviewImages(previewBlobNames);
+        p.setPriceUSD(priceUSD);
+        p.setCopies(copies);
+        p.setStatus(status);
+        
         return new ResponseEntity<>(postsServ.createPost(p), HttpStatus.CREATED);
     }
 
