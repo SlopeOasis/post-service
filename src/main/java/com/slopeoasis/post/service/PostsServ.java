@@ -88,6 +88,11 @@ public class PostsServ {
         return postsRepo.findByTagAndStatusActive(tag, pageable);
     }
 
+    //Javni po tagu (ACTIVE) brez pagingiranja - za interno uporabo
+    public java.util.List<Posts> getPostsByTag(Tag tag) {
+        return postsRepo.findByTagAndStatusActive(tag);
+    }
+
     //Javni po temah/interesih (ACTIVE) – ustreza kateremukoli od treh tagov
     public java.util.List<Posts> getPostsByThemes(Tag t1, Tag t2, Tag t3, Pageable pageable) {
         return postsRepo.findByMultipleTagsActive(t1, t2, t3, pageable);

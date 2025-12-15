@@ -1,5 +1,6 @@
 package com.slopeoasis.post.controller;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,8 +20,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpEntity;
 
 import com.slopeoasis.post.entity.Posts;
 import com.slopeoasis.post.entity.Posts.Status;
@@ -36,22 +39,27 @@ public class PostsCont {
 
     private final PostsServ postsServ;
     private final AzureBlobServ azureBlobServ;
+    private final RestTemplate restTemplate;
     private final String internalApiKey;
+    private final String userApiUrl;
     private final int defaultSasMinutes;
     private final int minSasMinutes;
     private final int maxSasMinutes;
 
-    public PostsCont(PostsServ postsServ, AzureBlobServ azureBlobServ,
+    public PostsCont(PostsServ postsServ, AzureBlobServ azureBlobServ, RestTemplate restTemplate,
                      @org.springframework.beans.factory.annotation.Value("${sas.default.minutes:60}") int defaultSasMinutes,
                      @org.springframework.beans.factory.annotation.Value("${sas.min.minutes:1}") int minSasMinutes,
                      @org.springframework.beans.factory.annotation.Value("${sas.max.minutes:120}") int maxSasMinutes,
-                     @Value("${internal.api.key:}") String internalApiKey) {
+                     @Value("${internal.api.key:}") String internalApiKey,
+                     @Value("${user.api.url:http://localhost:8080}") String userApiUrl) {
         this.postsServ = postsServ;
         this.azureBlobServ = azureBlobServ;
+        this.restTemplate = restTemplate;
         this.defaultSasMinutes = defaultSasMinutes;
         this.minSasMinutes = minSasMinutes;
         this.maxSasMinutes = maxSasMinutes;
         this.internalApiKey = internalApiKey;
+        this.userApiUrl = userApiUrl;
     }
 
     //za kreiranje novih objav
@@ -168,6 +176,23 @@ public class PostsCont {
                 .orElse(ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not allowed or post not found"));
     }
 
+    //za posodabljanje glavne datoteke posta (multipart upload nove datoteke)
+    @PutMapping(path = "/{id}/file-multipart", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateFileMultipart(@PathVariable Integer id,
+                                                 @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                                 @RequestAttribute(name = "X-User-Id", required = false) String userId) {
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (file == null || file.isEmpty()) return ResponseEntity.badRequest().body("File is required");
+        try {
+            String newBlob = azureBlobServ.uploadFile(file);
+            return postsServ.updatePostFile(id, userId, newBlob)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not allowed or post not found"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to upload file");
+        }
+    }
+
     //za pridobivanje info o postu glede na id
     @GetMapping("/{id}")
     public ResponseEntity<?> getPost(@PathVariable Integer id) {
@@ -228,20 +253,6 @@ public class PostsCont {
         return ResponseEntity.ok(postsServ.getPostsByTag(t, pageable));
     }
 
-    //za pridobivanje postov po več tagih (interesi uporabnika)
-    @GetMapping("/themes")
-    public ResponseEntity<?> byThemes(@RequestParam(required = false) String tag1,
-                                      @RequestParam(required = false) String tag2,
-                                      @RequestParam(required = false) String tag3,
-                                      @RequestParam(defaultValue = "0") int page,
-                                      @RequestParam(defaultValue = "20") int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Tag t1 = parseTagNullable(tag1);
-        Tag t2 = parseTagNullable(tag2);
-        Tag t3 = parseTagNullable(tag3);
-        return ResponseEntity.ok(postsServ.getPostsByThemes(t1, t2, t3, pageable));
-    }
-
     //za iskanje postov po naslovu
     @GetMapping("/search/title")
     public ResponseEntity<?> searchTitle(@RequestParam String q,
@@ -266,6 +277,60 @@ public class PostsCont {
             return ResponseEntity.ok(postsServ.searchByBlobNameAnyStatus(q, pageable));
         }
         return ResponseEntity.ok(postsServ.searchByBlobName(q, pageable));
+    }
+
+    //za pridobivanje postov glede na uporabnikove teme/interese, uporabimo user API
+    @GetMapping("/themes")
+    public ResponseEntity<?> byThemes(@RequestAttribute(name = "X-User-Id", required = false) String userId,
+                                      @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing user ID");
+        }
+        
+        try {
+            // Call user API to get user's themes, forwarding the auth token
+            String userApiThemesUrl = userApiUrl + "/users/themes";
+            
+            HttpHeaders headers = new HttpHeaders();
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                headers.set("Authorization", authHeader);
+            }
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            ResponseEntity<String[]> themesResponse = restTemplate.exchange(
+                userApiThemesUrl, 
+                org.springframework.http.HttpMethod.GET, 
+                entity, 
+                String[].class
+            );
+            
+            if (!themesResponse.hasBody() || themesResponse.getBody() == null) {
+                return ResponseEntity.ok(List.of());
+            }
+            
+            String[] themes = themesResponse.getBody();
+            List<Posts> allPosts = new java.util.ArrayList<>();
+            
+            // Fetch posts for each theme
+            for (String theme : themes) {
+                if (theme != null && !theme.isEmpty()) {
+                    try {
+                        List<Posts> postsForTheme = postsServ.getPostsByTag(Posts.Tag.valueOf(theme.toUpperCase()));
+                        allPosts.addAll(postsForTheme);
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("[PostsCont] Invalid theme: " + theme);
+                        // Skip invalid themes
+                    }
+                }
+            }
+            
+            return ResponseEntity.ok(allPosts);
+        } catch (Exception e) {
+            System.err.println("[PostsCont] Error fetching themes/posts: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to fetch posts by user themes");
+        }
     }
 
     //za ocenjevanje posta s strani kupca
@@ -301,6 +366,31 @@ public class PostsCont {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    //za zamenjavo predoglednih slik (multipart upload), prepiše celoten seznam previewImages
+    @PutMapping(path = "/{id}/previews-multipart", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> replacePreviews(@PathVariable Integer id,
+                                             @RequestParam(value = "previewImages", required = false) java.util.List<org.springframework.web.multipart.MultipartFile> previewImages,
+                                             @RequestAttribute(name = "X-User-Id", required = false) String userId) {
+        if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        java.util.List<String> previewBlobNames = new java.util.ArrayList<>();
+        if (previewImages != null) {
+            for (org.springframework.web.multipart.MultipartFile preview : previewImages) {
+                if (preview != null && !preview.isEmpty()) {
+                    try {
+                        previewBlobNames.add(azureBlobServ.uploadFile(preview));
+                    } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to upload preview image");
+                    }
+                }
+            }
+        }
+        Posts updates = new Posts();
+        updates.setPreviewImages(previewBlobNames);
+        return postsServ.editPost(id, userId, updates)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElse(ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not allowed or post not found"));
+    }
+
     //za generiranje časovno omejene SAS povezave za prenos datoteke
     //osnovna avtorizacija: dovoli le prodajalcu ali kupcu tega posta, casovno imejen na 60 minut privzeto, v application.properties/.env
     @GetMapping("/{id}/blob-sas")
@@ -317,6 +407,35 @@ public class PostsCont {
         boolean isBuyer = post.getBuyers() != null && post.getBuyers().contains(userId);
         if (!isSeller && !isBuyer) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Not allowed");
+        }
+
+        String effectiveBlob = blobName != null ? blobName : post.getAzBlobName();
+        if (blobName != null) {
+            boolean allowedBlob = effectiveBlob.equals(post.getAzBlobName()) ||
+                    (post.getPreviewImages() != null && post.getPreviewImages().contains(effectiveBlob));
+            if (!allowedBlob) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Blob not allowed for this post");
+            }
+        }
+
+        int requested = (minutes == null) ? defaultSasMinutes : minutes;
+        int ttl = Math.max(minSasMinutes, Math.min(requested, maxSasMinutes));
+        return azureBlobServ.generateSasUrl(effectiveBlob, ttl)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/public-sas")
+    public ResponseEntity<?> publicSas(@PathVariable Integer id,
+                                       @RequestParam(required = false) Integer minutes,
+                                       @RequestParam(required = false) String blobName) {
+        Optional<Posts> postOpt = postsServ.getPostInfo(id);
+        if (postOpt.isEmpty()) return ResponseEntity.notFound().build();
+        Posts post = postOpt.get();
+
+        // Only allow ACTIVE posts for public access
+        if (post.getStatus() != Posts.Status.ACTIVE) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Post not available for public access");
         }
 
         String effectiveBlob = blobName != null ? blobName : post.getAzBlobName();

@@ -26,6 +26,10 @@ public interface PostsRepo extends JpaRepository<Posts, Integer> {
     @Query("SELECT p FROM Posts p WHERE :tag MEMBER OF p.tags AND p.status = com.slopeoasis.post.entity.Posts.Status.ACTIVE")
     List<Posts> findByTagAndStatusActive(@Param("tag") Tag tag, Pageable pageable);
     
+    //javni prikaz po tagu brez pagingiranja
+    @Query("SELECT p FROM Posts p WHERE :tag MEMBER OF p.tags AND p.status = com.slopeoasis.post.entity.Posts.Status.ACTIVE")
+    List<Posts> findByTagAndStatusActive(@Param("tag") Tag tag);
+    
     //za naključni feed in priporočila
     List<Posts> findByStatus(Posts.Status status, Pageable pageable);
     

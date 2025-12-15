@@ -21,8 +21,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                     "/posts/search/**",
                     "/posts/tag/**",
-                    "/posts/themes/**",
-                    "/posts/public/**"
+                    "/posts/public/**",
+                    "/posts/*/public-sas"
                 );
     }
 }
