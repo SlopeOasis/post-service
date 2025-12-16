@@ -22,7 +22,8 @@ public class SecurityConfig implements WebMvcConfigurer {
                     "/posts/search/**",
                     "/posts/tag/**",
                     "/posts/public/**",
-                    "/posts/*/public-sas"
+                    "/posts/*/public-sas",
+                    "/posts/seller/**"
                 );
     }
 }
