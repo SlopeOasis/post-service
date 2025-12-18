@@ -202,6 +202,15 @@ public class PostsCont {
         return ResponseEntity.ok(new PostWithRating(postOpt.get(), summary));
     }
 
+    //za pridobivanje info o postu glede na id (public version without auth)
+    @GetMapping("/public/{id}")
+    public ResponseEntity<?> getPostPublic(@PathVariable Integer id) {
+        Optional<Posts> postOpt = postsServ.getPostInfo(id);
+        if (postOpt.isEmpty()) return ResponseEntity.notFound().build();
+        RatingSummary summary = postsServ.getRatingSummary(id);
+        return ResponseEntity.ok(new PostWithRating(postOpt.get(), summary));
+    }
+
     //za preverjanje ali je post na voljo za nakup
     @GetMapping("/{id}/availability")
     public ResponseEntity<?> availability(@PathVariable Integer id) {

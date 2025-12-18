@@ -223,7 +223,8 @@ Dodaj kupca objavi (interni klic payment-service).
 
 ### 🌐 Javni endpoints (brez JWT)
 
-- **GET /posts/{id}** - podrobnosti objave
+- **GET /posts/public/{id}** - podrobnosti objave (brez JWT)
+- **GET /posts/{id}** - podrobnosti objave (zahteva JWT)
 - **GET /posts/seller/{sellerId}** - objave prodajalca
 - **GET /posts/tag/{tag}** - objave po oznaki
 - **GET /posts/search/title?q=...** - iskanje po naslovu
@@ -235,7 +236,9 @@ Dodaj kupca objavi (interni klic payment-service).
 - `azure-storage-blob` - File storage
 - `spring-boot-starter-security` - Security framework
 
-*** End Patch
+## DTO (odgovori)
+
+### AvailabilityResponse
 ```java
 {
   boolean available,

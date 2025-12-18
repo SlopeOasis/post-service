@@ -15,10 +15,10 @@ public class SecurityConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // Apply JWT validation to all endpoints except public reads and OPTIONS
+        // Apply JWT validation to all endpoints except public reads
         registry.addInterceptor(jwtInterceptor)
-                .addPathPatterns("/posts/**")
-                .excludePathPatterns(
+                    .addPathPatterns("/posts/**")
+                    .excludePathPatterns(
                     "/posts/search/**",
                     "/posts/tag/**",
                     "/posts/public/**",
@@ -27,3 +27,16 @@ public class SecurityConfig implements WebMvcConfigurer {
                 );
     }
 }
+
+
+
+// Apply JWT validation to all endpoints except public reads and OPTIONS
+//        registry.addInterceptor(jwtInterceptor)
+//                .addPathPatterns("/posts/**")
+//                .excludePathPatterns(
+//                    "/posts/search/**",
+//                    "/posts/tag/**",
+//                    "/posts/public/**",
+//                    "/posts/*/public-sas",
+//                    "/posts/seller/**"
+//                );
