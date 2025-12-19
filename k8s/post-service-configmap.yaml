@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: post-service-config
+data:
+  SERVER_PORT: "8081"
+
+  # Clerk JWT
+  CLERK_ISSUER: "https://upright-bird-25.clerk.accounts.dev"
+  CLERK_JWKS_URL: "https://upright-bird-25.clerk.accounts.dev/.well-known/jwks.json"
+  JWT_DEV_MODE: "false"
+
+  # Azure/Azurite
+  AZURE_CONTAINER_NAME: "slopeoasisfiles"
+
+  # Multipart upload limits
+  MAX_FILE_SIZE: "200MB"
+  MAX_REQUEST_SIZE: "250MB"
+  FILE_SIZE_THRESHOLD: "2MB"
+  TOMCAT_MAX_SWALLOW_SIZE: "-1"
