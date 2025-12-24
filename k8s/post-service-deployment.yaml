@@ -19,17 +19,38 @@ spec:
           ports:
             - containerPort: 8081
           env:
-            - name: SPRING_DATASOURCE_URL
-              value: jdbc:postgresql://post-db:5432/postdb
-            - name: SPRING_DATASOURCE_USERNAME
-              value: post
-            - name: SPRING_DATASOURCE_PASSWORD
-              value: password
-            - name: AZURE_CONNECTION_STRING
-              valueFrom:
-                secretKeyRef:
-                  name: post-service-secrets
-                  key: AZURE_CONNECTION_STRING
+              - name: SPRING_DATASOURCE_URL
+                value: jdbc:postgresql://$(PGHOST):$(PGPORT)/$(PGDATABASE)?sslmode=require
+              - name: SPRING_DATASOURCE_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: posts-db-secret
+                    key: PGUSER
+              - name: SPRING_DATASOURCE_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: posts-db-secret
+                    key: PGPASSWORD
+              - name: PGHOST
+                valueFrom:
+                  secretKeyRef:
+                    name: posts-db-secret
+                    key: PGHOST
+              - name: PGPORT
+                valueFrom:
+                  secretKeyRef:
+                    name: posts-db-secret
+                    key: PGPORT
+              - name: PGDATABASE
+                valueFrom:
+                  secretKeyRef:
+                    name: posts-db-secret
+                    key: PGDATABASE
+              - name: AZURE_CONNECTION_STRING
+                valueFrom:
+                  secretKeyRef:
+                    name: post-blob-secret
+                    key: AZURE_CONNECTION_STRING
           envFrom:
             - configMapRef:
                 name: post-service-config
