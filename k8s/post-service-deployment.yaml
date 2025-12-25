@@ -12,15 +12,15 @@ spec:
       labels:
         app: post-service
     spec:
+      imagePullSecrets:
+        - name: acr-auth
       containers:
         - name: post-service
-          image: post-service:latest
-          imagePullPolicy: IfNotPresent
+          image: slopeoasisacr.azurecr.io/post-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8081
           env:
-              - name: SPRING_DATASOURCE_URL
-                value: jdbc:postgresql://$(PGHOST):$(PGPORT)/$(PGDATABASE)?sslmode=require
               - name: SPRING_DATASOURCE_USERNAME
                 valueFrom:
                   secretKeyRef:
@@ -46,11 +46,19 @@ spec:
                   secretKeyRef:
                     name: posts-db-secret
                     key: PGDATABASE
+              - name: AZURE_CONTAINER_NAME
+                valueFrom:
+                  configMapKeyRef:
+                    name: post-service-config
+                    key: AZURE_CONTAINER_NAME
               - name: AZURE_CONNECTION_STRING
                 valueFrom:
                   secretKeyRef:
                     name: post-blob-secret
                     key: AZURE_CONNECTION_STRING
+              - name: USER_API_URL
+                value: http://user-service:8080
+
           envFrom:
             - configMapRef:
                 name: post-service-config

@@ -4,6 +4,7 @@ metadata:
   name: post-service-config
 data:
   SERVER_PORT: "8081"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://userdatabase.postgres.database.azure.com:5432/postsdb?sslmode=require" 
 
   # Clerk JWT
   CLERK_ISSUER: "https://upright-bird-25.clerk.accounts.dev"

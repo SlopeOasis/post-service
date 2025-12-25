@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Health check endpoint for debugging connectivity.
  */
 @RestController
-@RequestMapping("/health")
+@RequestMapping("/healthpost")
 public class HealthController {
     
     @GetMapping
