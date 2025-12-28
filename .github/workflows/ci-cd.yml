@@ -1,0 +1,34 @@
+name: Build & Deploy post-service
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Login to ACR
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Build & push image
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/post-service:latest .
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/post-service:latest
+
+    - name: Deploy on VM via SSH
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.VM_SSH_KEY }}
+        script: |
+          kubectl rollout restart deployment post-service
