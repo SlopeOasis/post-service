@@ -25,6 +25,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpEntity;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 import com.slopeoasis.post.entity.Posts;
 import com.slopeoasis.post.entity.Posts.Status;
 import com.slopeoasis.post.entity.Posts.Tag;
@@ -63,6 +67,13 @@ public class PostsCont {
     }
 
     //za kreiranje novih objav
+    @Operation(summary = "Create post")
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Post created"),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "500", description = "Failed to upload file")
+    })
     @PostMapping
     public ResponseEntity<?> createPost(
                                         @RequestParam("title") String title,
@@ -134,6 +145,13 @@ public class PostsCont {
     }
 
     //za urejanje obstoječih objav
+    @Operation(summary = "Edit post")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Post updated"),
+        @ApiResponse(responseCode = "400", description = "Invalid request"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "403", description = "Forbidden or post not found")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<?> editPost(@PathVariable Integer id, @RequestBody UpdatePostRequest req,
                                       @RequestAttribute(name = "X-User-Id", required = false) String userId) {
@@ -155,6 +173,13 @@ public class PostsCont {
     }
 
     //za spreminjanje statusa objav
+    @Operation(summary = "Change post status")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Status updated"),
+        @ApiResponse(responseCode = "400", description = "Invalid status"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "403", description = "Forbidden or post not found")
+    })
     @PutMapping("/{id}/status")
     public ResponseEntity<?> changeStatus(@PathVariable Integer id, @RequestBody StatusChangeRequest req,
                                           @RequestAttribute(name = "X-User-Id", required = false) String userId) {
@@ -167,6 +192,12 @@ public class PostsCont {
     }
 
     //za posodabljanje glavne datoteke posta
+    @Operation(summary = "Update main file reference")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "File reference updated"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "403", description = "Forbidden or post not found")
+    })
     @PutMapping("/{id}/file")
     public ResponseEntity<?> updateFile(@PathVariable Integer id, @RequestBody FileUpdateRequest req,
                                         @RequestAttribute(name = "X-User-Id", required = false) String userId) {
@@ -177,6 +208,14 @@ public class PostsCont {
     }
 
     //za posodabljanje glavne datoteke posta (multipart upload nove datoteke)
+    @Operation(summary = "Upload new main file")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "File updated"),
+        @ApiResponse(responseCode = "400", description = "File is required"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "403", description = "Forbidden or post not found"),
+        @ApiResponse(responseCode = "500", description = "Failed to upload file")
+    })
     @PutMapping(path = "/{id}/file-multipart", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> updateFileMultipart(@PathVariable Integer id,
                                                  @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
@@ -194,6 +233,11 @@ public class PostsCont {
     }
 
     //za pridobivanje info o postu glede na id
+    @Operation(summary = "Get post by id")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK"),
+        @ApiResponse(responseCode = "404", description = "Post not found")
+    })
     @GetMapping("/{id}")
     public ResponseEntity<?> getPost(@PathVariable Integer id) {
         Optional<Posts> postOpt = postsServ.getPostInfo(id);
@@ -203,6 +247,11 @@ public class PostsCont {
     }
 
     //za pridobivanje info o postu glede na id (public version without auth)
+    @Operation(summary = "Get public post by id")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK"),
+        @ApiResponse(responseCode = "404", description = "Post not found")
+    })
     @GetMapping("/public/{id}")
     public ResponseEntity<?> getPostPublic(@PathVariable Integer id) {
         Optional<Posts> postOpt = postsServ.getPostInfo(id);
@@ -212,6 +261,11 @@ public class PostsCont {
     }
 
     //za preverjanje ali je post na voljo za nakup
+    @Operation(summary = "Check availability")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Available"),
+        @ApiResponse(responseCode = "404", description = "Post not found")
+    })
     @GetMapping("/{id}/availability")
     public ResponseEntity<?> availability(@PathVariable Integer id) {
         return postsServ.checkAvailability(id)
@@ -220,6 +274,12 @@ public class PostsCont {
     }
 
     //za dodajanje kupca k postu (po nakupu)
+    @Operation(summary = "Add buyer to post")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Buyer added"),
+        @ApiResponse(responseCode = "400", description = "Cannot add buyer or post not found"),
+        @ApiResponse(responseCode = "403", description = "Forbidden")
+    })
     @PostMapping("/{id}/buyers")
     public ResponseEntity<?> addBuyer(@PathVariable Integer id, @RequestBody AddBuyerRequest req,
                                       @RequestParam(name = "key", required = false) String key) {
@@ -234,6 +294,10 @@ public class PostsCont {
     }
 
     //za pridobivanje postov določenega sellerja
+    @Operation(summary = "List posts by seller")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK")
+    })
     @GetMapping("/seller/{sellerId}")
     public List<Posts> bySeller(@PathVariable String sellerId,
                                 @RequestParam(defaultValue = "0") int page,
@@ -243,6 +307,10 @@ public class PostsCont {
     }
 
     //za pridobivanje postov ki jih je kupil določen buyer
+    @Operation(summary = "List posts by buyer")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK")
+    })
     @GetMapping("/buyer/{buyerId}")
     public List<Posts> byBuyer(@PathVariable String buyerId,
                                @RequestParam(defaultValue = "0") int page,
@@ -252,6 +320,11 @@ public class PostsCont {
     }
 
     //za pridobivanje postov po tagu
+    @Operation(summary = "List posts by tag")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK"),
+        @ApiResponse(responseCode = "400", description = "Invalid tag")
+    })
     @GetMapping("/tag/{tag}")
     public ResponseEntity<?> byTag(@PathVariable String tag,
                                    @RequestParam(defaultValue = "0") int page,
@@ -263,6 +336,10 @@ public class PostsCont {
     }
 
     //za iskanje postov po naslovu
+    @Operation(summary = "Search posts by title")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK")
+    })
     @GetMapping("/search/title")
     public ResponseEntity<?> searchTitle(@RequestParam String q,
                                          @RequestParam(defaultValue = "false") boolean anyStatus,
@@ -276,6 +353,10 @@ public class PostsCont {
     }
 
     //za iskanje postov po imenu shranjene datoteke/blob-a, lahko jih dobimo več ker imamo partial match imen
+    @Operation(summary = "Search posts by blob name")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK")
+    })
     @GetMapping("/search/blob")
     public ResponseEntity<?> searchBlob(@RequestParam String q,
                                         @RequestParam(defaultValue = "false") boolean anyStatus,
@@ -289,6 +370,12 @@ public class PostsCont {
     }
 
     //za pridobivanje postov glede na uporabnikove teme/interese, uporabimo user API
+    @Operation(summary = "Get posts by user themes")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "500", description = "Failed to fetch posts by themes")
+    })
     @GetMapping("/themes")
     public ResponseEntity<?> byThemes(@RequestAttribute(name = "X-User-Id", required = false) String userId,
                                       @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authHeader) {
@@ -343,6 +430,11 @@ public class PostsCont {
     }
 
     //za ocenjevanje posta s strani kupca
+    @Operation(summary = "Rate post")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Rating submitted"),
+        @ApiResponse(responseCode = "400", description = "Rating failed")
+    })
     @PostMapping("/{id}/ratings")
     public ResponseEntity<?> rate(@PathVariable Integer id, @RequestBody RatingRequest req) {
         if (!postsServ.submitRating(id, req.buyerId, req.rating)) {
@@ -352,18 +444,31 @@ public class PostsCont {
     }
 
     //za pridobivanje vseh ocen posta
+    @Operation(summary = "List ratings")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK")
+    })
     @GetMapping("/{id}/ratings")
     public ResponseEntity<List<Rating>> ratings(@PathVariable Integer id) {
         return ResponseEntity.ok(postsServ.getRatings(id));
     }
 
     //za pridobivanje average ocene in števila ocen posta
+    @Operation(summary = "Get rating summary")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK")
+    })
     @GetMapping("/{id}/ratings/summary")
     public ResponseEntity<RatingSummary> ratingSummary(@PathVariable Integer id) {
         return ResponseEntity.ok(postsServ.getRatingSummary(id));
     }
 
     //za pridobivanje metapodatkov datoteke posta iz Azure Blob Storage, ala velikost, tip
+    @Operation(summary = "Get blob metadata")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "OK"),
+        @ApiResponse(responseCode = "404", description = "Post or blob not found")
+    })
     @GetMapping("/{id}/blob-metadata")
     public ResponseEntity<?> blobMetadata(@PathVariable Integer id,
                                           @RequestParam(required = false) String blobName) {
@@ -376,6 +481,13 @@ public class PostsCont {
     }
 
     //za zamenjavo predoglednih slik (multipart upload), prepiše celoten seznam previewImages
+    @Operation(summary = "Replace preview images")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Preview images replaced"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "403", description = "Forbidden or post not found"),
+        @ApiResponse(responseCode = "500", description = "Failed to upload preview image")
+    })
     @PutMapping(path = "/{id}/previews-multipart", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> replacePreviews(@PathVariable Integer id,
                                              @RequestParam(value = "previewImages", required = false) java.util.List<org.springframework.web.multipart.MultipartFile> previewImages,
@@ -402,6 +514,13 @@ public class PostsCont {
 
     //za generiranje časovno omejene SAS povezave za prenos datoteke
     //osnovna avtorizacija: dovoli le prodajalcu ali kupcu tega posta, casovno imejen na 60 minut privzeto, v application.properties/.env
+    @Operation(summary = "Generate SAS for post blob")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "SAS generated"),
+        @ApiResponse(responseCode = "401", ref = "#/components/responses/UnauthorizedError"),
+        @ApiResponse(responseCode = "403", description = "Forbidden"),
+        @ApiResponse(responseCode = "404", description = "Post or blob not found")
+    })
     @GetMapping("/{id}/blob-sas")
     public ResponseEntity<?> blobSas(@PathVariable Integer id,
                                      @RequestParam(required = false) Integer minutes,
@@ -434,6 +553,12 @@ public class PostsCont {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "Generate public SAS for active post")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "SAS generated"),
+        @ApiResponse(responseCode = "403", description = "Post not available or blob not allowed"),
+        @ApiResponse(responseCode = "404", description = "Post or blob not found")
+    })
     @GetMapping("/{id}/public-sas")
     public ResponseEntity<?> publicSas(@PathVariable Integer id,
                                        @RequestParam(required = false) Integer minutes,

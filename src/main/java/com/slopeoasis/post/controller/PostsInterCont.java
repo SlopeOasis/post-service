@@ -9,6 +9,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 import com.slopeoasis.post.service.PostsIntServ;
 
 @RestController
@@ -25,6 +29,10 @@ public class PostsInterCont {
             UUID paymentIntentId
     ) {}
 
+    @Operation(summary = "Grant access to post (internal)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Access granted")
+    })
     @PostMapping("/{postId}/grant-access")
     public ResponseEntity<Void> grantAccess(
             @PathVariable Integer postId,
